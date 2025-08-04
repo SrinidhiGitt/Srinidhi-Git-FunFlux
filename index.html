@@ -158,13 +158,11 @@
                     </button>
                     <button onclick="showPage(event, 'settings')" class="nav-link-sidebar block p-3 rounded-xl text-gray-400 transition duration-200 hover:bg-gray-100 hover:text-gray-600 group">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.298.608 3.3 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span>Settings</span>
-                </button>
-            </div>
-        </aside>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                    </button>
+                </div>
+            </aside>
             
         <!-- Main Content Area -->
         <main class="flex-1 p-4 md:p-8 overflow-y-auto">
@@ -373,11 +371,24 @@
     const reportTabLinks = document.querySelectorAll('.report-tab-link');
     const reportTabContents = document.querySelectorAll('.report-tab-content');
 
-    // Function to create a job object with dynamic dates based on the current day
+    /**
+     * Creates a job object with dynamic dates based on the scheduled hour.
+     * @param {number} id The job's unique ID.
+     * @param {string} name The job's name.
+     * @param {number} hour The scheduled hour (0-23).
+     * @param {number} minute The scheduled minute (0-59).
+     */
     function createJob(id, name, hour, minute) {
         const now = new Date();
-        const nextRun = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute);
-        const previousRun = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, hour, minute);
+        const nextRun = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
+
+        // If the scheduled time is in the past, schedule it for the next day.
+        if (nextRun.getTime() < now.getTime()) {
+            nextRun.setDate(nextRun.getDate() + 1);
+        }
+
+        const previousRun = new Date(nextRun);
+        previousRun.setDate(previousRun.getDate() - 1);
 
         return {
             id: id,
@@ -386,13 +397,17 @@
             previousRun: previousRun,
             previousRunStatus: 'success',
             currentRunning: false,
+            isScheduled: false,
             errorLog: 'No',
+            // Store the default hour and minute
+            defaultHour: hour,
+            defaultMinute: minute
         };
     }
 
     // Initial job data with dynamic dates and a default 'No' error log
     let jobs = [
-        createJob(1, 'Add Periodic Accrual Transactions', 12, 15),
+        createJob(1, 'Add Periodic Accrual Transactions', 0, 15), // Updated to 12:15 AM
         createJob(2, 'Auto Payment From Savings', 19, 30),
         createJob(3, 'Center Workflow Next Loan Cycle', 5, 30),
         createJob(4, 'Check For Dormant Users', 1, 0),
@@ -400,13 +415,13 @@
         createJob(6, 'Gst DB push', 21, 10),
         createJob(7, 'Make Loan as FLDG After DPD limit', 1, 5),
         createJob(8, 'OFSAA Move staging data to Archive and update accruals (BOD)', 6, 0),
-        createJob(9, 'OFSAA Update staging on loan events', 11, 10),
+        createJob(9, 'OFSAA Update staging on loan events', 1, 11), // Updated to 01:11 AM
         createJob(10, 'Post Overdue Receivable Due', 21, 20),
-        createJob(11, 'Process Batch Accounting Transactions', 10, 10),
+        createJob(11, 'Process Batch Accounting Transactions', 1, 10), // Updated to 01:10 AM
         createJob(12, 'Process Npa Loans Details', 1, 0),
         createJob(13, 'Push Transactions to BC Portal', 22, 30),
         createJob(14, 'Sync Banking Offices with BC', 4, 0),
-        createJob(15, 'Update Loan Arrears Ageing', 12, 1),
+        createJob(15, 'Update Loan Arrears Ageing', 0, 1), // Updated to 12:01 AM
     ];
 
     /**
@@ -521,15 +536,17 @@
             // This is the updated logic to prioritize the "Running" status
             if (job.currentRunning) {
                 statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Running</span>`;
+            } else if (job.isScheduled) {
+                statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Scheduled</span>`;
             } else if (job.previousRunStatus === 'success') {
                 statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Success</span>`;
             } else if (job.previousRunStatus === 'fail') {
                 statusBadge = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Failed</span>`;
             }
 
-            // Display previous run date
+            // Display previous run date, now with normal font-weight
             if (job.previousRun) {
-                previousRunHtml = `<span class="font-semibold text-gray-900">${formatDateTime(job.previousRun)}</span>`;
+                previousRunHtml = `<span class="text-gray-900">${formatDateTime(job.previousRun)}</span>`;
             }
 
             // Display error log
@@ -636,6 +653,10 @@
             job.previousRun = new Date();
             job.previousRunStatus = 'success';
             job.errorLog = 'No';
+
+            // IMPORTANT: Rerunning a job does not affect the next scheduled run.
+            // The `nextRun` value is preserved.
+
             showToast(`Job "${job.name}" completed successfully.`, 'success');
             renderReportsTable();
         }, 10000); 
@@ -679,7 +700,7 @@
         if (users[username] && users[username] === password) {
             loginPage.classList.add('hidden');
             mainApp.classList.remove('hidden');
-            showPage(e, 'reports'); // Default to the reports page after login
+            showPage(e, 'dashboard'); // Default to the dashboard page after login
         } else {
             loginError.classList.remove('hidden');
         }
@@ -700,10 +721,12 @@
         const now = new Date();
         const delay = scheduledTime.getTime() - now.getTime();
         
-        // Update the next run time immediately
+        // Update the next run time and set the status to "Scheduled"
         job.nextRun = scheduledTime;
         job.previousRunStatus = null;
         job.errorLog = 'No';
+        job.isScheduled = true;
+        
         showToast(`Job "${job.name}" has been scheduled for ${formatDateTime(scheduledTime)}.`, 'info');
         closeRescheduleModal();
         renderReportsTable();
@@ -713,6 +736,7 @@
             setTimeout(() => {
                 // When the timer finishes, the job starts running
                 job.currentRunning = true;
+                job.isScheduled = false; // Reset scheduled status
                 showToast(`Scheduled job "${job.name}" is now running.`, 'info');
                 renderReportsTable();
 
@@ -720,7 +744,6 @@
                 setTimeout(() => {
                     job.currentRunning = false;
                     job.previousRun = new Date();
-                    job.nextRun = null; // Next run is now unknown until rescheduled
                     
                     if (failJob) {
                         job.previousRunStatus = 'fail';
@@ -730,6 +753,13 @@
                         job.previousRunStatus = 'success';
                         job.errorLog = 'No';
                         showToast(`Job "${job.name}" completed successfully.`, 'success');
+                        
+                        // After successful completion, reset to the default schedule
+                        const defaultNextRun = new Date(job.previousRun);
+                        defaultNextRun.setDate(defaultNextRun.getDate() + 1);
+                        defaultNextRun.setHours(job.defaultHour);
+                        defaultNextRun.setMinutes(job.defaultMinute);
+                        job.nextRun = defaultNextRun;
                     }
                     renderReportsTable();
                 }, 10000); // 10 seconds
@@ -737,14 +767,14 @@
         } else {
              // If scheduled time is in the past or now, run immediately
              job.currentRunning = true;
+             job.isScheduled = false; // Reset scheduled status
              showToast(`Job "${job.name}" is running now.`, 'info');
              renderReportsTable();
 
              setTimeout(() => {
                 job.currentRunning = false;
                 job.previousRun = new Date();
-                job.nextRun = null;
-                
+
                 if (failJob) {
                     job.previousRunStatus = 'fail';
                     job.errorLog = 'Job failed as configured during scheduling.';
@@ -753,6 +783,13 @@
                     job.previousRunStatus = 'success';
                     job.errorLog = 'No';
                     showToast(`Job "${job.name}" completed successfully.`, 'success');
+
+                    // After successful completion, reset to the default schedule
+                    const defaultNextRun = new Date(job.previousRun);
+                    defaultNextRun.setDate(defaultNextRun.getDate() + 1);
+                    defaultNextRun.setHours(job.defaultHour);
+                    defaultNextRun.setMinutes(job.defaultMinute);
+                    job.nextRun = defaultNextRun;
                 }
                 renderReportsTable();
              }, 10000);
